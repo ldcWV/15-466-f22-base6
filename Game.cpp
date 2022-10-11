@@ -119,6 +119,29 @@ void Game::remove_player(Player *player) {
 }
 
 void Game::update(float elapsed) {
+	// update coin stuff
+	if (coin_countdown > 0) {
+		coin_countdown -= fmin(coin_countdown, elapsed);
+		if (coin_countdown == 0) {
+			break_countdown = break_duration;
+			for (auto& p: players) {
+				if (!p.collected_coin) {
+					p.revealed_countdown = revealed_duration;
+				}
+			}
+		}
+	} else {
+		assert(break_countdown > 0);
+		break_countdown -= fmin(break_countdown, elapsed);
+		if (break_countdown == 0) {
+			coin_countdown = coin_duration;
+			coin_position = random_point_in_arena(0.2f, CoinRadius);
+			for (auto& p: players) {
+				p.collected_coin = false;
+			}
+		}
+	}
+
 	static float PI = acos(-1.f);
 
 	// npc position update:
@@ -156,8 +179,13 @@ void Game::update(float elapsed) {
 		npc.position += npc.direction * 0.5f * elapsed;
 	}
 
+	for (auto &p : players) if (!p.dead) {
+		p.revealed_countdown -= fmin(p.revealed_countdown, elapsed);
+	}
+
 	//player position update:
 	for (auto &p : players) if (!p.dead) {
+		p.dash_cooldown -= fmin(p.dash_cooldown, elapsed);
 		if (p.dash_countdown == 0.f) {
 			//move normally
 			glm::vec2 dir = glm::vec2(0.0f, 0.0f);
@@ -173,13 +201,13 @@ void Game::update(float elapsed) {
 			p.position += dir * 0.5f * elapsed;
 
 			//detect dash
-			if (p.controls.space.downs) {
+			if (p.controls.space.downs && p.dash_cooldown == 0.f) {
 				p.dash_countdown = 0.15f;
 				p.dash_dir = dir;
+				p.dash_cooldown = p.dash_cooldown_duration;
 			}
-
 		} else {
-			//dash in dash_dir
+			//mid dash, move in dash_dir
 			float dash_time = fmin(elapsed, p.dash_countdown);
 			p.dash_countdown -= dash_time;
 
@@ -216,10 +244,16 @@ void Game::update(float elapsed) {
 				if (&p1 == &p2) continue;
 				glm::vec2 p12 = p2.position - p1.position;
 				float len2 = glm::length2(p12);
-				std::cout << len2 << std::endl;
 				if (len2 < (2.f * PlayerRadius) * (2.f * PlayerRadius)) {
 					p2.dead = true;
 				}
+			}
+		}
+
+		//did we collect coin?
+		if (coin_countdown > 0) {
+			if (glm::length(p1.position - coin_position) < PlayerRadius + CoinRadius) {
+				p1.collected_coin = true;
 			}
 		}
 	}
@@ -254,10 +288,18 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	connection.send(uint8_t(0));
 	size_t mark = connection.send_buffer.size(); //keep track of this position in the buffer
 
+	//coin stuff
+	connection.send(coin_countdown);
+	connection.send(break_countdown);
+	connection.send(coin_position);
+
 	//send player info helper:
 	auto send_player = [&](Player const &player) {
 		connection.send(player.position);
 		connection.send(player.dead);
+		connection.send(player.collected_coin);
+		connection.send(player.revealed_countdown);
+		connection.send(player.dash_cooldown);
 	};
 
 	//player count:
@@ -306,6 +348,10 @@ bool Game::recv_state_message(Connection *connection_) {
 		at += sizeof(*val);
 	};
 
+	read(&coin_countdown);
+	read(&break_countdown);
+	read(&coin_position);
+
 	players.clear();
 	uint8_t player_count;
 	read(&player_count);
@@ -314,6 +360,9 @@ bool Game::recv_state_message(Connection *connection_) {
 		Player &player = players.back();
 		read(&player.position);
 		read(&player.dead);
+		read(&player.collected_coin);
+		read(&player.revealed_countdown);
+		read(&player.dash_cooldown);
 	}
 
 	npcs.clear();

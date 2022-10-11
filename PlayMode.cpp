@@ -10,6 +10,7 @@
 
 #include <random>
 #include <array>
+#include <string.h>
 
 PlayMode::PlayMode(Client &client_) : client(client_) {
 }
@@ -152,8 +153,38 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
 		lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
 
-		glm::u8vec4 col = glm::u8vec4(0xff, 0xff, 0xff, 0xff);
+		glm::vec2 text_coords = glm::vec2(Game::ArenaMin.x, Game::ArenaMin.y - 2*Game::PlayerRadius);
+		if (game.coin_countdown > 0) {
+			bool collected = game.players.front().collected_coin;
+			draw_text(text_coords,
+			          "Coin disappears in: " + std::to_string(int(game.coin_countdown)) + (collected ? ", collected!" : ", not collected"),
+					  0.1f);
+			for (uint32_t a = 0; a < circle.size(); ++a) {
+				lines.draw(
+					glm::vec3(game.coin_position + Game::CoinRadius * circle[a], 0.0f),
+					glm::vec3(game.coin_position + Game::CoinRadius * circle[(a+1)%circle.size()], 0.0f),
+					glm::u8vec4(0xff, 0xff, 0x00, 0xff)
+				);
+			}
+		} else {
+			draw_text(text_coords, "Next coin in: " + std::to_string(int(game.break_countdown)), 0.1f);
+		}
+
+		{ //dash cooldown indicator
+			auto& p = game.players.front();
+			if (p.dash_cooldown > 0.f) {
+				draw_text(p.position + glm::vec2(-0.02f, 0.07f),
+						std::to_string(int(p.dash_cooldown)),
+						0.07f);
+			}
+		}
+
+		//draw players
 		for (auto const &player : game.players) if(!player.dead) {
+			glm::u8vec4 col = glm::u8vec4(0xff, 0xff, 0xff, 0xff);
+			if (player.revealed_countdown > 0) {
+				col = glm::u8vec4(0xff, 0x00, 0x00, 0xff);
+			}
 			if (&player == &game.players.front()) {
 				//mark current player (which server sends first):
 				lines.draw(
@@ -176,7 +207,9 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			}
 		}
 
+		//draw npcs
 		for (auto const &npc : game.npcs) {
+			glm::u8vec4 col = glm::u8vec4(0xff, 0xff, 0xff, 0xff);
 			for (uint32_t a = 0; a < circle.size(); ++a) {
 				lines.draw(
 					glm::vec3(npc.position + Game::PlayerRadius * circle[a], 0.0f),
@@ -185,6 +218,8 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				);
 			}
 		}
+
+		//draw coin
 	}
 	GL_ERRORS();
 }

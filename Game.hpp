@@ -38,12 +38,16 @@ struct Player {
 		bool recv_controls_message(Connection *connection);
 	} controls;
 
-	float dash_countdown = 0.f;
+	float dash_countdown = 0.f; // time before dash ends
 	glm::vec2 dash_dir = glm::vec2(0.f, 0.f);
+	float dash_cooldown_duration = 5.f; // seconds between consecutive dashes
+	float dash_cooldown = 0.f; // time before can dash again
 
 	//player state (sent from server):
 	glm::vec2 position = glm::vec2(0.0f, 0.0f);
 	bool dead = false;
+	bool collected_coin = false;
+	float revealed_countdown = 0.f;
 };
 
 struct NPC {
@@ -84,7 +88,15 @@ struct Game {
 	inline static constexpr float PlayerRadius = 0.06f;
 	inline static constexpr float PlayerSpeed = 2.0f;
 	inline static constexpr float PlayerAccelHalflife = 0.25f;
-	
+
+	//coin stuff
+	inline static constexpr float coin_duration = 15.f;
+	inline static constexpr float break_duration = 20.f;
+	inline static constexpr float revealed_duration = 2.f;
+	float coin_countdown = 0.f;
+	float break_countdown = 10.f;
+	inline static constexpr float CoinRadius = 0.03f;
+	glm::vec2 coin_position = glm::vec2(0.f, 0.f);
 
 	//---- communication helpers ----
 
