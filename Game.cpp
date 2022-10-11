@@ -150,7 +150,7 @@ void Game::update(float elapsed) {
 		float dist_to_dest = glm::length(npc.position - npc.destination);
 		if (dist_to_dest < PlayerRadius) {
 			npc.destination = random_point_in_arena(0.f, 0.f);
-			npc.rest_countdown = mt() / float(mt.max()) < 0.2 ? 0.f : 2.f + 5.f * mt() / float(mt.max());
+			npc.rest_countdown = mt() / float(mt.max()) < 0.5 ? 0.f : 2.f + 5.f * mt() / float(mt.max());
 			npc.direction_change_cooldown = 0.f;
 		}
 
