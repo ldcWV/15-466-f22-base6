@@ -28,7 +28,7 @@ struct Button {
 struct Player {
 	//player inputs (sent from client):
 	struct Controls {
-		Button left, right, up, down, jump;
+		Button left, right, up, down, space;
 
 		void send_controls_message(Connection *connection) const;
 
@@ -38,12 +38,12 @@ struct Player {
 		bool recv_controls_message(Connection *connection);
 	} controls;
 
+	float dash_countdown = 0.f;
+	glm::vec2 dash_dir = glm::vec2(0.f, 0.f);
+
 	//player state (sent from server):
 	glm::vec2 position = glm::vec2(0.0f, 0.0f);
-	glm::vec2 velocity = glm::vec2(0.0f, 0.0f);
-
-	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
-	std::string name = "";
+	bool dead = false;
 };
 
 struct Game {
@@ -64,8 +64,8 @@ struct Game {
 	inline static constexpr float Tick = 1.0f / 30.0f;
 
 	//arena size:
-	inline static constexpr glm::vec2 ArenaMin = glm::vec2(-0.75f, -1.0f);
-	inline static constexpr glm::vec2 ArenaMax = glm::vec2( 0.75f,  1.0f);
+	inline static constexpr glm::vec2 ArenaMin = glm::vec2(-2.0f, -1.0f);
+	inline static constexpr glm::vec2 ArenaMax = glm::vec2( 2.0f,  1.0f);
 
 	//player constants:
 	inline static constexpr float PlayerRadius = 0.06f;
