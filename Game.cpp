@@ -75,6 +75,25 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 //-----------------------------------------
 
 Game::Game() : mt(0x15466666) {
+	spawn_npcs();
+}
+
+glm::vec2 Game::random_point_in_arena(float center_weight, float boundary_thickness) {
+	// center_weight = 0 -> spawn completely random
+	// center_weight = 1 -> spawn only in center
+	glm::vec2 res;
+	res.x = glm::mix(ArenaMin.x + 2.0f * boundary_thickness, ArenaMax.x - 2.0f * boundary_thickness, center_weight/2 + (1 - center_weight) * mt() / float(mt.max()));
+	res.y = glm::mix(ArenaMin.y + 2.0f * boundary_thickness, ArenaMax.y - 2.0f * boundary_thickness, center_weight/2 + (1 - center_weight) * mt() / float(mt.max()));
+	return res;
+}
+
+void Game::spawn_npcs() {
+	for (int i = 0; i < NUM_NPCS; i++) {
+		NPC npc;
+		npc.position = random_point_in_arena(0.2f);
+		npc.destination = random_point_in_arena(0.0f);
+		npcs.push_back(npc);
+	}
 }
 
 Player *Game::spawn_player() {
@@ -82,8 +101,7 @@ Player *Game::spawn_player() {
 	Player &player = players.back();
 
 	//random point in the middle area of the arena:
-	player.position.x = glm::mix(ArenaMin.x + 2.0f * PlayerRadius, ArenaMax.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
-	player.position.y = glm::mix(ArenaMin.y + 2.0f * PlayerRadius, ArenaMax.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
+	player.position = random_point_in_arena(0.2f);
 
 	return &player;
 }
@@ -101,7 +119,44 @@ void Game::remove_player(Player *player) {
 }
 
 void Game::update(float elapsed) {
-	//position update:
+	static float PI = acos(-1.f);
+
+	// npc position update:
+	for (auto &npc : npcs) {
+		//if close to destination, pick a new one and possibly rest for a bit
+		float dist_to_dest = glm::length(npc.position - npc.destination);
+		if (dist_to_dest < PlayerRadius) {
+			npc.destination = random_point_in_arena(0.f, 0.f);
+			npc.rest_countdown = mt() / float(mt.max()) < 0.2 ? 0.f : 2.f + 5.f * mt() / float(mt.max());
+			npc.direction_change_cooldown = 0.f;
+		}
+
+		//if currently resting or have a designated direction, go that way
+		npc.rest_countdown -= fmin(npc.rest_countdown, elapsed);
+		npc.direction_change_cooldown -= fmin(npc.direction_change_cooldown, elapsed);
+		if (npc.rest_countdown > 0) continue;
+		if (npc.direction_change_cooldown > 0) {
+			npc.position += npc.direction * 0.5f * elapsed;
+			continue;
+		}
+
+		// recompute direction towards destination
+		glm::vec2 best_dir = glm::vec2(0.f, 0.f);
+		float best_dist = 100000.f;
+		for (float angle = 0.f; angle < 2*PI; angle += PI / 4) {
+			glm::vec2 dir = glm::vec2(cos(angle), sin(angle));
+			float dist = glm::length2(npc.position + dir - npc.destination);
+			if (dist < best_dist) {
+				best_dir = dir;
+				best_dist = dist;
+			}
+		}
+		npc.direction = best_dir;
+		npc.direction_change_cooldown = 0.25f + 1.f * mt() / float(mt.max());
+		npc.position += npc.direction * 0.5f * elapsed;
+	}
+
+	//player position update:
 	for (auto &p : players) if (!p.dead) {
 		if (p.dash_countdown == 0.f) {
 			//move normally
@@ -139,7 +194,7 @@ void Game::update(float elapsed) {
 		p.controls.space.downs = 0;
 	}
 
-	//collision resolution:
+	//player collision resolution:
 	for (auto &p1 : players) if (!p1.dead) {
 		//player/arena collisions:
 		if (p1.position.x < ArenaMin.x + PlayerRadius) {
@@ -166,6 +221,22 @@ void Game::update(float elapsed) {
 					p2.dead = true;
 				}
 			}
+		}
+	}
+
+	//npc/arena collisions
+	for (auto &npc : npcs) {
+		if (npc.position.x < ArenaMin.x + PlayerRadius) {
+			npc.position.x = ArenaMin.x + PlayerRadius;
+		}
+		if (npc.position.x > ArenaMax.x - PlayerRadius) {
+			npc.position.x = ArenaMax.x - PlayerRadius;
+		}
+		if (npc.position.y < ArenaMin.y + PlayerRadius) {
+			npc.position.y = ArenaMin.y + PlayerRadius;
+		}
+		if (npc.position.y > ArenaMax.y - PlayerRadius) {
+			npc.position.y = ArenaMax.y - PlayerRadius;
 		}
 	}
 
@@ -197,6 +268,12 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	for (auto const &player : players) {
 		if (&player == connection_player) continue;
 		send_player(player);
+	}
+
+	//npc count:
+	connection.send(uint8_t(npcs.size()));
+	for (auto const &npc : npcs) {
+		connection.send(npc.position);
 	}
 
 	//compute the message size and patch into the message header:
@@ -237,6 +314,15 @@ bool Game::recv_state_message(Connection *connection_) {
 		Player &player = players.back();
 		read(&player.position);
 		read(&player.dead);
+	}
+
+	npcs.clear();
+	uint8_t npc_count;
+	read(&npc_count);
+	for (uint8_t i = 0; i < npc_count; ++i) {
+		npcs.emplace_back();
+		NPC &npc = npcs.back();
+		read(&npc.position);
 	}
 
 	if (at != size) throw std::runtime_error("Trailing data in state message.");

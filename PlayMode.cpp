@@ -152,8 +152,8 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
 		lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
 
+		glm::u8vec4 col = glm::u8vec4(0xff, 0xff, 0xff, 0xff);
 		for (auto const &player : game.players) if(!player.dead) {
-			glm::u8vec4 col = glm::u8vec4(0xff, 0xff, 0xff, 0xff);
 			if (&player == &game.players.front()) {
 				//mark current player (which server sends first):
 				lines.draw(
@@ -171,6 +171,16 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				lines.draw(
 					glm::vec3(player.position + Game::PlayerRadius * circle[a], 0.0f),
 					glm::vec3(player.position + Game::PlayerRadius * circle[(a+1)%circle.size()], 0.0f),
+					col
+				);
+			}
+		}
+
+		for (auto const &npc : game.npcs) {
+			for (uint32_t a = 0; a < circle.size(); ++a) {
+				lines.draw(
+					glm::vec3(npc.position + Game::PlayerRadius * circle[a], 0.0f),
+					glm::vec3(npc.position + Game::PlayerRadius * circle[(a+1)%circle.size()], 0.0f),
 					col
 				);
 			}

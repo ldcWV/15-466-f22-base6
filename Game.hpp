@@ -46,15 +46,28 @@ struct Player {
 	bool dead = false;
 };
 
+struct NPC {
+	glm::vec2 position = glm::vec2(0.f, 0.f);
+	glm::vec2 destination = glm::vec2(0.f, 0.f);
+	float rest_countdown = 0.f;
+	float direction_change_cooldown = 0.f;
+	glm::vec2 direction = glm::vec2(0.f, 0.f);
+};
+
 struct Game {
 	std::list< Player > players; //(using list so they can have stable addresses)
 	Player *spawn_player(); //add player the end of the players list (may also, e.g., play some spawn anim)
 	void remove_player(Player *); //remove player from game (may also, e.g., play some despawn anim)
 
 	std::mt19937 mt; //used for spawning players
-	uint32_t next_player_number = 1; //used for naming players
+
+	static constexpr int NUM_NPCS = 50;
+	std::vector< NPC > npcs;
+	void Game::spawn_npcs();
 
 	Game();
+
+	glm::vec2 random_point_in_arena(float center_weight, float boundary_thickness = PlayerRadius);
 
 	//state update function:
 	void update(float elapsed);
