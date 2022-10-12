@@ -12,9 +12,9 @@ Screen Shot:
 
 How To Play:
 
-WASD to move
-Spacebar to dash briefly in the direction of movement (5s cooldown)
-R to restart (can be done by any player)
+- WASD to move
+- Spacebar to dash briefly in the direction of movement (5s cooldown)
+- R to restart (can be done by any player)
 
 The goal of the game is to kill other players by dashing through them and be the last one standing. However, this is not straightforward as there are 30 NPCs also walking around that look exactly the same as the players. Dashing exposes your own position to other players, so spamming it is probably a bad idea.
 
