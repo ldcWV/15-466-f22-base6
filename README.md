@@ -22,6 +22,8 @@ The game alternates between two phases: coin phase and break phase. During coin 
 
 Thus, the main strategy is to move in a way similar to the NPCs. When a coin spawns, you should collect it inconspicuously to avoid drawing attention. Meanwhile, you have to pay attention to the other circles to decide which ones are real players.
 
+Note that players spawn in spectating mode by default. You need to press 'R' to restart so that all spectators become players.
+
 Sources: reused some default assets (circles and rectangular arena)
 
 This game was built with [NEST](NEST.md).
