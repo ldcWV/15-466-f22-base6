@@ -43,6 +43,9 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			controls.space.downs += 1;
 			controls.space.pressed = true;
 			return true;
+		} else if (evt.key.keysym.sym == SDLK_r) {
+			controls.r.downs += 1;
+			controls.r.pressed = true;
 		}
 	} else if (evt.type == SDL_KEYUP) {
 		if (evt.key.keysym.sym == SDLK_a) {
@@ -59,6 +62,9 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			return true;
 		} else if (evt.key.keysym.sym == SDLK_SPACE) {
 			controls.space.pressed = false;
+			return true;
+		} else if (evt.key.keysym.sym == SDLK_r) {
+			controls.r.pressed = false;
 			return true;
 		}
 	}
@@ -77,6 +83,7 @@ void PlayMode::update(float elapsed) {
 	controls.up.downs = 0;
 	controls.down.downs = 0;
 	controls.space.downs = 0;
+	controls.r.downs = 0;
 
 	//send/receive data:
 	client.poll([this](Connection *c, Connection::Event event){
@@ -148,26 +155,28 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				glm::u8vec4(0xff, 0xff, 0xff, 0x00));
 		};
 
-		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
-		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
-		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
-		lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
+		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::u8vec4(0xff, 0xff, 0xff, 0xff));
+		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0xff, 0xff, 0xff));
+		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0xff, 0xff, 0xff));
+		lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0xff, 0xff, 0xff));
 
-		glm::vec2 text_coords = glm::vec2(Game::ArenaMin.x, Game::ArenaMin.y - 2*Game::PlayerRadius);
-		if (game.coin_countdown > 0) {
-			bool collected = game.players.front().collected_coin;
-			draw_text(text_coords,
-			          "Coin disappears in: " + std::to_string(int(game.coin_countdown)) + (collected ? ", collected!" : ", not collected"),
-					  0.1f);
-			for (uint32_t a = 0; a < circle.size(); ++a) {
-				lines.draw(
-					glm::vec3(game.coin_position + Game::CoinRadius * circle[a], 0.0f),
-					glm::vec3(game.coin_position + Game::CoinRadius * circle[(a+1)%circle.size()], 0.0f),
-					glm::u8vec4(0xff, 0xff, 0x00, 0xff)
-				);
+		{ //coin info
+			glm::vec2 text_coords = glm::vec2(Game::ArenaMin.x, Game::ArenaMin.y - 2*Game::PlayerRadius);
+			if (game.coin_countdown > 0) {
+				bool collected = game.players.front().collected_coin;
+				draw_text(text_coords,
+						"Coin disappears in: " + std::to_string(int(game.coin_countdown)) + (collected ? ", collected!" : ", not collected"),
+						0.1f);
+				for (uint32_t a = 0; a < circle.size(); ++a) {
+					lines.draw(
+						glm::vec3(game.coin_position + Game::CoinRadius * circle[a], 0.0f),
+						glm::vec3(game.coin_position + Game::CoinRadius * circle[(a+1)%circle.size()], 0.0f),
+						glm::u8vec4(0xff, 0xff, 0x00, 0xff)
+					);
+				}
+			} else {
+				draw_text(text_coords, "Next coin in: " + std::to_string(int(game.break_countdown)), 0.1f);
 			}
-		} else {
-			draw_text(text_coords, "Next coin in: " + std::to_string(int(game.break_countdown)), 0.1f);
 		}
 
 		{ //dash cooldown indicator
@@ -177,6 +186,20 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 						std::to_string(int(p.dash_cooldown)),
 						0.07f);
 			}
+		}
+
+		{ //player counters
+			int alive = 0;
+			int dead = 0;
+			int spec = 0;
+			for (auto& p : game.players) {
+				if (p.dead == 0) alive++;
+				else if (p.dead == 1) dead++;
+				else spec++;
+			}
+			draw_text(glm::vec2(Game::ArenaMax.x - 1.1f, Game::ArenaMin.y - 2*Game::PlayerRadius),
+					  "Alive/Dead/Spectating: " + std::to_string(alive) + "/" + std::to_string(dead) + "/" + std::to_string(spec),
+					  0.1f);
 		}
 
 		//draw players
@@ -218,8 +241,6 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				);
 			}
 		}
-
-		//draw coin
 	}
 	GL_ERRORS();
 }

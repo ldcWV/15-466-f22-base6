@@ -12,7 +12,7 @@ void Player::Controls::send_controls_message(Connection *connection_) const {
 	assert(connection_);
 	auto &connection = *connection_;
 
-	uint32_t size = 5;
+	uint32_t size = 6;
 	connection.send(Message::C2S_Controls);
 	connection.send(uint8_t(size));
 	connection.send(uint8_t(size >> 8));
@@ -30,6 +30,7 @@ void Player::Controls::send_controls_message(Connection *connection_) const {
 	send_button(up);
 	send_button(down);
 	send_button(space);
+	send_button(r);
 }
 
 bool Player::Controls::recv_controls_message(Connection *connection_) {
@@ -44,7 +45,7 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 	uint32_t size = (uint32_t(recv_buffer[3]) << 16)
 	              | (uint32_t(recv_buffer[2]) << 8)
 	              |  uint32_t(recv_buffer[1]);
-	if (size != 5) throw std::runtime_error("Controls message with size " + std::to_string(size) + " != 5!");
+	if (size != 6) throw std::runtime_error("Controls message with size " + std::to_string(size) + " != 6!");
 	
 	//expecting complete message:
 	if (recv_buffer.size() < 4 + size) return false;
@@ -64,6 +65,7 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 	recv_button(recv_buffer[4+2], &up);
 	recv_button(recv_buffer[4+3], &down);
 	recv_button(recv_buffer[4+4], &space);
+	recv_button(recv_buffer[4+5], &r);
 
 	//delete message from buffer:
 	recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + 4 + size);
@@ -88,6 +90,7 @@ glm::vec2 Game::random_point_in_arena(float center_weight, float boundary_thickn
 }
 
 void Game::spawn_npcs() {
+	npcs.clear();
 	for (int i = 0; i < NUM_NPCS; i++) {
 		NPC npc;
 		npc.position = random_point_in_arena(0.2f);
@@ -96,12 +99,27 @@ void Game::spawn_npcs() {
 	}
 }
 
+void Game::restart() {
+	spawn_npcs();
+
+	for(auto& p: players) {
+		p.dead = 0;
+		p.dash_cooldown = 0.f;
+		p.dash_countdown = 0.f;
+		p.collected_coin = false;
+		p.revealed_countdown = 0.f;
+		p.position = random_point_in_arena(0.2f);
+	}
+
+	coin_countdown = 0.f;
+	break_countdown = 10.f;
+}
+
 Player *Game::spawn_player() {
 	players.emplace_back();
 	Player &player = players.back();
 
-	//random point in the middle area of the arena:
-	player.position = random_point_in_arena(0.2f);
+	player.dead = 2;
 
 	return &player;
 }
@@ -119,6 +137,13 @@ void Game::remove_player(Player *player) {
 }
 
 void Game::update(float elapsed) {
+	// check restart
+	for (auto& p : players) {
+		if (p.controls.r.downs) {
+			restart();
+		}
+	}
+
 	// update coin stuff
 	if (coin_countdown > 0) {
 		coin_countdown -= fmin(coin_countdown, elapsed);
@@ -150,7 +175,7 @@ void Game::update(float elapsed) {
 		float dist_to_dest = glm::length(npc.position - npc.destination);
 		if (dist_to_dest < PlayerRadius) {
 			npc.destination = random_point_in_arena(0.f, 0.f);
-			npc.rest_countdown = mt() / float(mt.max()) < 0.5 ? 0.f : 2.f + 5.f * mt() / float(mt.max());
+			npc.rest_countdown = mt() / float(mt.max()) < 0.1 ? 0.f : 2.f + 5.f * mt() / float(mt.max());
 			npc.direction_change_cooldown = 0.f;
 		}
 
@@ -220,6 +245,7 @@ void Game::update(float elapsed) {
 		p.controls.up.downs = 0;
 		p.controls.down.downs = 0;
 		p.controls.space.downs = 0;
+		p.controls.r.downs = 0;
 	}
 
 	//player collision resolution:
@@ -245,7 +271,8 @@ void Game::update(float elapsed) {
 				glm::vec2 p12 = p2.position - p1.position;
 				float len2 = glm::length2(p12);
 				if (len2 < (2.f * PlayerRadius) * (2.f * PlayerRadius)) {
-					p2.dead = true;
+					p2.dead = 1;
+					p2.dash_countdown = 0.f; // make sure they don't kill anyone while dead
 				}
 			}
 		}

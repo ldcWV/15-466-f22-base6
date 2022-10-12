@@ -28,7 +28,7 @@ struct Button {
 struct Player {
 	//player inputs (sent from client):
 	struct Controls {
-		Button left, right, up, down, space;
+		Button left, right, up, down, space, r;
 
 		void send_controls_message(Connection *connection) const;
 
@@ -45,7 +45,7 @@ struct Player {
 
 	//player state (sent from server):
 	glm::vec2 position = glm::vec2(0.0f, 0.0f);
-	bool dead = false;
+	int dead = 0;
 	bool collected_coin = false;
 	float revealed_countdown = 0.f;
 };
@@ -71,6 +71,8 @@ struct Game {
 
 	Game();
 
+	void restart();
+
 	glm::vec2 random_point_in_arena(float center_weight, float boundary_thickness = PlayerRadius);
 
 	//state update function:
@@ -78,7 +80,7 @@ struct Game {
 
 	//constants:
 	//the update rate on the server:
-	inline static constexpr float Tick = 1.0f / 30.0f;
+	inline static constexpr float Tick = 1.0f / 144.0f;
 
 	//arena size:
 	inline static constexpr glm::vec2 ArenaMin = glm::vec2(-2.0f, -1.0f);
